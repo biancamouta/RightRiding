@@ -1,7 +1,10 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'DirectionsProvider.dart';
+import 'package:geocoding/geocoding.dart';
 
 class MapPage extends StatefulWidget {
   @override
@@ -11,7 +14,7 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   GoogleMapController mapController;
   CameraPosition _initialLocation =
-      CameraPosition(target: LatLng(-26.2903102, -48.8623476));
+      CameraPosition(target: LatLng(-26.2903102, -48.8623476), zoom: 13,);
 
   final startAddressController = TextEditingController();
   final destinationAddressController = TextEditingController();
@@ -20,6 +23,8 @@ class _MapPageState extends State<MapPage> {
   String _destinationAddress = '';
   String _currentAddress = '';
   String _placeDistance;
+
+  get locations => null;
 
   Widget _textField({
     TextEditingController controller,
@@ -94,11 +99,6 @@ class _MapPageState extends State<MapPage> {
                   polylines: api.currentRoute,
                   onMapCreated: (GoogleMapController controller) {
                     mapController = controller;
-
-                    var api =
-                        Provider.of<DirectionProvider>(context, listen: false);
-                    api.findDirections(LatLng(-26.2903102, -48.8623476),
-                        LatLng(-26.2903102, -48.8623476));
                   },
                 );
               },
@@ -160,52 +160,56 @@ class _MapPageState extends State<MapPage> {
                           ),
                           SizedBox(height: 5),
                           RaisedButton(
-                            // onPressed: (_startAddress != '' &&
-                            //     _destinationAddress != '')
-                            //     ? () async {
-                            //   setState(() {
-                            //     if (markers.isNotEmpty) markers.clear();
-                            //     if (polylines.isNotEmpty)
-                            //       polylines.clear();
-                            //     if (polylineCoordinates.isNotEmpty)
-                            //       polylineCoordinates.clear();
-                            //     _placeDistance = null;
-                            //   });
-                            //
-                            //   _calculateDistance().then((isCalculated) {
-                            //     if (isCalculated) {
-                            //       _scaffoldKey.currentState.showSnackBar(
-                            //         SnackBar(
-                            //           content: Text(
-                            //               'Distance Calculated Sucessfully'),
-                            //         ),
-                            //       );
-                            //     } else {
-                            //       _scaffoldKey.currentState.showSnackBar(
-                            //         SnackBar(
-                            //           content: Text(
-                            //               'Error Calculating Distance'),
-                            //         ),
-                            //       );
-                            //     }
-                            //   });
-                            // }
-                            //     : null,
-                            // color: Colors.red,
-                            // shape: RoundedRectangleBorder(
-                            //   borderRadius: BorderRadius.circular(20.0),
-                            // ),
-                            // child: Padding(
-                            //   padding: const EdgeInsets.all(8.0),
-                            //   child: Text(
-                            //     'Show Route'.toUpperCase(),
-                            //     style: TextStyle(
-                            //       color: Colors.white,
-                            //       fontSize: 20.0,
-                            //       ),
-                            //     ),
-                            //   ),
+                            onPressed: (_startAddress != '' &&
+                                _destinationAddress != '')
+                                ? () async {
 
+                              setState(() {
+                                LatLng fromPoint = LatLng(-26.2873668,-48.8470739);
+                                LatLng toPoint = LatLng(-26.2926669,-48.8476211);
+
+                                var api =
+                                Provider.of<DirectionProvider>(context, listen: false);
+                                api.findDirections(_startAddress, _destinationAddress);
+
+                                var left = min(fromPoint.latitude, toPoint.latitude);
+                                var right = max(fromPoint.latitude, toPoint.latitude);
+                                var top = max(fromPoint.longitude, toPoint.longitude);
+                                var bottom = min(fromPoint.longitude, toPoint.longitude);
+
+                                api.currentRoute.first.points.forEach((point) {
+                                  left = min(left, point.latitude);
+                                  right = max(right, point.latitude);
+                                  top = max(top, point.longitude);
+                                  bottom = min(bottom, point.longitude);
+                                });
+
+                                var bounds = LatLngBounds(
+                                  southwest: LatLng(left, bottom),
+                                  northeast: LatLng(right, top),
+                                );
+
+                                var cameraUpdate = CameraUpdate.newLatLngBounds(bounds, 50);
+                                mapController.animateCamera(cameraUpdate);
+
+
+                              });
+                            }
+                                : null,
+                            color: Colors.red,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20.0),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(
+                                'Show Route'.toUpperCase(),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20.0,
+                                  ),
+                                ),
+                              ),
                           ),
                         ],
                       ),
