@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'DirectionsProvider.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+
 
 class MapPage extends StatefulWidget {
   @override
@@ -13,6 +14,9 @@ class MapPage extends StatefulWidget {
 
 class _MapPageState extends State<MapPage> {
   GoogleMapController mapController;
+
+  final Geolocator _geolocator = Geolocator();
+
   CameraPosition _initialLocation =
       CameraPosition(target: LatLng(-26.2903102, -48.8623476), zoom: 13,);
 
@@ -79,7 +83,6 @@ class _MapPageState extends State<MapPage> {
   Widget build(BuildContext context) {
     var height = MediaQuery.of(context).size.height;
     var width = MediaQuery.of(context).size.width;
-    var _placeDistance = 20;
 
     return Container(
       child: Scaffold(
