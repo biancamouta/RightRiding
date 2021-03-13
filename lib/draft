@@ -1,0 +1,148 @@
+class SearchRoutePage extends StatelessWidget {
+  final TextEditingController _controllerFromField = TextEditingController();
+  final TextEditingController _controllerToField = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Buscar Rota"),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 200.0, horizontal: 30.0),
+        child: Column(
+          children: <Widget>[
+            Editor(_controllerFromField, "From"),
+            Editor(_controllerToField, "To"),
+            RaisedButton(
+              child: Text("Buscar"),
+              onPressed: () {
+                final String from = _controllerFromField.text;
+                final String to = _controllerToField.text;
+                Route(from, to);
+                final Future<Route> future = Navigator.push(context,
+                    MaterialPageRoute(builder: (context) {
+                  return RouteMap();
+                }));
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class NewEventReportPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Reportar evento"),
+      ),
+      body: Column(
+        children: <Widget>[
+          Expanded(
+            child: EventGrid(),
+          ),
+          RaisedButton(
+            child: Text("Reportar"),
+            onPressed: () {
+              _showToast(context);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+
+class EventGrid extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      primary: false,
+      padding: const EdgeInsets.all(20),
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      crossAxisCount: 2,
+      children: <Widget>[
+        Container(
+          padding: const EdgeInsets.all(8),
+          child: const Text("Acidente"),
+          color: Colors.teal[100],
+        ),
+        Container(
+          padding: const EdgeInsets.all(8),
+          child: const Text('Engarrafamento'),
+          color: Colors.teal[300],
+        ),
+        Container(
+          padding: const EdgeInsets.all(8),
+          child: const Text('Obras na Pista'),
+          color: Colors.teal[200],
+        ),
+        Container(
+          padding: const EdgeInsets.all(8),
+          child: const Text('Outro'),
+          color: Colors.teal[400],
+        ),
+      ],
+    );
+  }
+}
+
+class Editor extends StatelessWidget {
+  final TextEditingController _controllerField;
+  final String _label;
+
+  Editor(this._controllerField, this._label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: TextField(
+        controller: _controllerField,
+        style: TextStyle(fontSize: 24.0),
+        decoration: InputDecoration(
+          border: OutlineInputBorder(),
+          labelText: _label,
+        ),
+      ),
+    );
+  }
+}
+
+---------------------
+
+    body: GoogleMap(
+      mapType: MapType.hybrid,
+      initialCameraPosition: _kGooglePlex,
+      onMapCreated: (GoogleMapController controller) {
+        _controller.complete(controller);
+      },
+    ),
+    floatingActionButton: FloatingActionButton.extended(
+      onPressed: _goToTheLake,
+      label: Text('To the lake!'),
+      icon: Icon(Icons.directions_boat),
+    ),
+  }
+
+  void _showToast(BuildContext context) {
+    final scaffold = Scaffold.of(context);
+    scaffold.showSnackBar(
+      SnackBar(
+        content: const Text('Added to favorite'),
+        action: SnackBarAction(
+            label: 'UNDO', onPressed: scaffold.hideCurrentSnackBar),
+      ),
+    );
+  }
+
+  Future<void> _goToTheLake() async {
+    final GoogleMapController controller = await _controller.future;
+    controller.animateCamera(CameraUpdate.newCameraPosition(_kLake));
+  }
+
