@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'DirectionsProvider.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 
 
 class MapPage extends StatefulWidget {
@@ -23,10 +24,18 @@ class _MapPageState extends State<MapPage> {
   final startAddressController = TextEditingController();
   final destinationAddressController = TextEditingController();
 
+  Position _currentPosition;
+
   String _startAddress = '';
   String _destinationAddress = '';
   String _currentAddress = '';
   String _placeDistance;
+
+  Set<Marker> markers = {};
+
+  PolylinePoints polylinePoints;
+  Map<PolylineId, Polyline> polylines = {};
+  List<LatLng> polylineCoordinates = [];
 
   get locations => null;
 
@@ -79,6 +88,155 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
+  _getCurrentLocation() async {
+    await _geolocator
+        .getCurrentPosition(desiredAccuracy: LocationAccuracy.high)
+        .then((Position position) async {
+      setState(() {
+        _currentPosition = position;
+        print('CURRENT POS: $_currentPosition');
+        mapController.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(position.latitude, position.longitude),
+              zoom: 18.0,
+            ),
+          ),
+        );
+      });
+      await _getCurrentAddress();
+    }).catchError((e) {
+      print(e);
+    });
+  }
+
+  _getCurrentAddress() async {
+    try {
+      List<Placemark> p = await _geolocator.placemarkFromCoordinates(
+          _currentPosition.latitude, _currentPosition.longitude);
+
+      Placemark place = p[0];
+
+      setState(() {
+        _currentAddress =
+        "${place.name}, ${place.locality}, ${place.postalCode}, ${place.country}";
+        startAddressController.text = _currentAddress;
+        _startAddress = _currentAddress;
+      });
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  Future<String> _getAddress(Position position) async {
+      List<Placemark> p = await _geolocator.placemarkFromCoordinates(
+          position.latitude, position.longitude);
+
+      Placemark place = p[0];
+      setState(() {
+        _currentAddress = "${place.name}, ${place.locality}, ${place.postalCode}, ${place.country}";
+      });
+  }
+  // Future<bool> _calculateDistance() async {
+  //   try {
+  //     // Retrieving placemarks from addresses
+  //     List<Placemark> startPlacemark =
+  //     await _geolocator.placemarkFromAddress(_startAddress);
+  //     List<Placemark> destinationPlacemark =
+  //     await _geolocator.placemarkFromAddress(_destinationAddress);
+  //
+  //     if (startPlacemark != null && destinationPlacemark != null) {
+  //       Position startCoordinates = _startAddress == _currentAddress
+  //           ? Position(
+  //           latitude: _currentPosition.latitude,
+  //           longitude: _currentPosition.longitude)
+  //           : startPlacemark[0].position;
+  //       Position destinationCoordinates = destinationPlacemark[0].position;
+  //
+  //       // Start Location Marker
+  //       Marker startMarker = Marker(
+  //         markerId: MarkerId('$startCoordinates'),
+  //         position: LatLng(
+  //           startCoordinates.latitude,
+  //           startCoordinates.longitude,
+  //         ),
+  //         infoWindow: InfoWindow(
+  //           title: 'Start',
+  //           snippet: _startAddress,
+  //         ),
+  //         icon: BitmapDescriptor.defaultMarker,
+  //       );
+  //
+  //       // Destination Location Marker
+  //       Marker destinationMarker = Marker(
+  //         markerId: MarkerId('$destinationCoordinates'),
+  //         position: LatLng(
+  //           destinationCoordinates.latitude,
+  //           destinationCoordinates.longitude,
+  //         ),
+  //         infoWindow: InfoWindow(
+  //           title: 'Destination',
+  //           snippet: _destinationAddress,
+  //         ),
+  //         icon: BitmapDescriptor.defaultMarker,
+  //       );
+  //
+  //       markers.add(startMarker);
+  //       markers.add(destinationMarker);
+  //
+  //       setState(() {
+  //         _placeDistance = totalDistance.toStringAsFixed(2);
+  //         print('DISTANCE: $_placeDistance km');
+  //       });
+  //
+  //       return true;
+  //     }
+  //   } catch (e) {
+  //     print(e);
+  //   }
+  //   return false;
+  // }
+
+  double _coordinateDistance(lat1, lon1, lat2, lon2) {
+    var p = 0.017453292519943295;
+    var c = cos;
+    var a = 0.5 -
+        c((lat2 - lat1) * p) / 2 +
+        c(lat1 * p) * c(lat2 * p) * (1 - c((lon2 - lon1) * p)) / 2;
+    return 12742 * asin(sqrt(a));
+  }
+
+  _createPolylines(Position start, Position destination) async {
+    polylinePoints = PolylinePoints();
+    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+      "AIzaSyAqBtGRNSUpEZAnZxAUbr_lov0nEKmI6eY", // Google Maps API Key
+      PointLatLng(start.latitude, start.longitude),
+      PointLatLng(destination.latitude, destination.longitude),
+      travelMode: TravelMode.transit,
+    );
+
+    if (result.points.isNotEmpty) {
+      result.points.forEach((PointLatLng point) {
+        polylineCoordinates.add(LatLng(point.latitude, point.longitude));
+      });
+    }
+
+    PolylineId id = PolylineId('poly');
+    Polyline polyline = Polyline(
+      polylineId: id,
+      color: Colors.red,
+      points: polylineCoordinates,
+      width: 3,
+    );
+    polylines[id] = polyline;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+  }
+
   @override
   Widget build(BuildContext context) {
     var height = MediaQuery.of(context).size.height;
@@ -86,6 +244,9 @@ class _MapPageState extends State<MapPage> {
 
     return Container(
       child: Scaffold(
+        appBar: AppBar(
+          title: Text("RightRiding"),
+        ),
         body: Stack(
           children: <Widget>[
             Consumer<DirectionProvider>(
@@ -167,35 +328,18 @@ class _MapPageState extends State<MapPage> {
                                 _destinationAddress != '')
                                 ? () async {
 
-                              setState(() {
-                                LatLng fromPoint = LatLng(-26.2873668,-48.8470739);
-                                LatLng toPoint = LatLng(-26.2926669,-48.8476211);
+                              List<Placemark> startPlacemark = await _geolocator.placemarkFromAddress(_startAddress);
+                              List<Placemark> destinationPlacemark = await _geolocator.placemarkFromAddress(_destinationAddress);
+                              Position fromPoint = startPlacemark[0].position;
+                              Position toPoint = destinationPlacemark[0].position;
 
-                                var api =
-                                Provider.of<DirectionProvider>(context, listen: false);
+                              var api = Provider.of<DirectionProvider>(context, listen: false);
+
+                              setState(() {
                                 api.findDirections(_startAddress, _destinationAddress);
 
-                                var left = min(fromPoint.latitude, toPoint.latitude);
-                                var right = max(fromPoint.latitude, toPoint.latitude);
-                                var top = max(fromPoint.longitude, toPoint.longitude);
-                                var bottom = min(fromPoint.longitude, toPoint.longitude);
-
-                                api.currentRoute.first.points.forEach((point) {
-                                  left = min(left, point.latitude);
-                                  right = max(right, point.latitude);
-                                  top = max(top, point.longitude);
-                                  bottom = min(bottom, point.longitude);
-                                });
-
-                                var bounds = LatLngBounds(
-                                  southwest: LatLng(left, bottom),
-                                  northeast: LatLng(right, top),
-                                );
-
-                                var cameraUpdate = CameraUpdate.newLatLngBounds(bounds, 50);
+                                var cameraUpdate = CameraUpdate.newLatLngBounds(_getScreenBounds(fromPoint, toPoint, api), 50);
                                 mapController.animateCamera(cameraUpdate);
-
-
                               });
                             }
                                 : null,
@@ -272,6 +416,27 @@ class _MapPageState extends State<MapPage> {
         ),
       ),
     );
+  }
+
+  _getScreenBounds( Position fromPoint, Position toPoint, DirectionProvider api) {
+    var left = min(fromPoint.latitude, toPoint.latitude);
+    var right = max(fromPoint.latitude, toPoint.latitude);
+    var top = max(fromPoint.longitude, toPoint.longitude);
+    var bottom = min(fromPoint.longitude, toPoint.longitude);
+
+    api.currentRoute.first.points.forEach((point) {
+      left = min(left, point.latitude);
+      right = max(right, point.latitude);
+      top = max(top, point.longitude);
+      bottom = min(bottom, point.longitude);
+    });
+
+    var bounds = LatLngBounds(
+      southwest: LatLng(left, bottom),
+      northeast: LatLng(right, top),
+    );
+
+    return bounds;
   }
 
   Set<Marker> _createMarkers() {
