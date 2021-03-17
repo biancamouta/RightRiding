@@ -30,8 +30,6 @@ class _MapPageState extends State<MapPage> {
   String _currentAddress = '';
   String _placeDistance;
 
-  Set<Marker> markers = {};
-
   PolylinePoints polylinePoints;
   Map<PolylineId, Polyline> polylines = {};
   List<LatLng> polylineCoordinates = [];
@@ -234,12 +232,14 @@ class _MapPageState extends State<MapPage> {
   void initState() {
     super.initState();
     _getCurrentLocation();
+    //_polylines = keyByPolylineId(widget.polylines);  botar as polylines da estrutur que pode começar aqui
   }
 
   @override
   Widget build(BuildContext context) {
     var height = MediaQuery.of(context).size.height;
     var width = MediaQuery.of(context).size.width;
+    Set<Marker> markers = Set<Marker>();
 
     return Container(
       child: Scaffold(
@@ -258,8 +258,8 @@ class _MapPageState extends State<MapPage> {
                   mapType: MapType.normal,
                   zoomGesturesEnabled: true,
                   zoomControlsEnabled: false,
-                  markers: null,
-                  polylines: api.currentRoute,
+                  markers: markers != null ? Set<Marker>.from(markers) : null,
+                  polylines: api.currentRoute, //posso add as polylines marcando ruas com infraestrutura cicloviaria bem clarinho
                   onMapCreated: (GoogleMapController controller) {
                     mapController = controller;
                   },
@@ -337,8 +337,11 @@ class _MapPageState extends State<MapPage> {
 
                               setState(() {
                                 api.findDirections(_startAddress, _destinationAddress);
+                                print("oiiiii");
 
-                                _createMarkers(fromPoint, toPoint); //preciso botar os markers no mapa. eles estao criados em uma lista aqui
+                                markers.add(Marker(
+                                    markerId: MarkerId('sourcePin'),
+                                    position: fromPoint),);
 
                                 var cameraUpdate = CameraUpdate.newLatLngBounds(_getScreenBounds(fromPoint, toPoint, api), 50);
                                 mapController.animateCamera(cameraUpdate);
