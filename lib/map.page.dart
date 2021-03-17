@@ -7,7 +7,6 @@ import 'DirectionsProvider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 
-
 class MapPage extends StatefulWidget {
   @override
   _MapPageState createState() => _MapPageState();
@@ -255,11 +254,11 @@ class _MapPageState extends State<MapPage> {
                 return GoogleMap(
                   initialCameraPosition: _initialLocation,
                   myLocationEnabled: true,
-                  myLocationButtonEnabled: false,
+                  myLocationButtonEnabled: true,
                   mapType: MapType.normal,
                   zoomGesturesEnabled: true,
                   zoomControlsEnabled: false,
-                  markers: _createMarkers(),
+                  markers: null,
                   polylines: api.currentRoute,
                   onMapCreated: (GoogleMapController controller) {
                     mapController = controller;
@@ -330,13 +329,16 @@ class _MapPageState extends State<MapPage> {
 
                               List<Placemark> startPlacemark = await _geolocator.placemarkFromAddress(_startAddress);
                               List<Placemark> destinationPlacemark = await _geolocator.placemarkFromAddress(_destinationAddress);
-                              Position fromPoint = startPlacemark[0].position;
-                              Position toPoint = destinationPlacemark[0].position;
 
                               var api = Provider.of<DirectionProvider>(context, listen: false);
 
+                              LatLng fromPoint = LatLng(startPlacemark[0].position.latitude, startPlacemark[0].position.longitude);
+                              LatLng toPoint = LatLng(destinationPlacemark[0].position.latitude, destinationPlacemark[0].position.longitude);
+
                               setState(() {
                                 api.findDirections(_startAddress, _destinationAddress);
+
+                                _createMarkers(fromPoint, toPoint); //preciso botar os markers no mapa. eles estao criados em uma lista aqui
 
                                 var cameraUpdate = CameraUpdate.newLatLngBounds(_getScreenBounds(fromPoint, toPoint, api), 50);
                                 mapController.animateCamera(cameraUpdate);
@@ -418,7 +420,7 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
-  _getScreenBounds( Position fromPoint, Position toPoint, DirectionProvider api) {
+  _getScreenBounds( LatLng fromPoint, LatLng toPoint, DirectionProvider api) {
     var left = min(fromPoint.latitude, toPoint.latitude);
     var right = max(fromPoint.latitude, toPoint.latitude);
     var top = max(fromPoint.longitude, toPoint.longitude);
@@ -439,18 +441,17 @@ class _MapPageState extends State<MapPage> {
     return bounds;
   }
 
-  Set<Marker> _createMarkers() {
+  Set<Marker> _createMarkers(LatLng fromPoint, LatLng toPoint) {
     var markers = Set<Marker>();
-
     markers.add(
       Marker(
           markerId: MarkerId("FromMarker"),
-          position: LatLng(-26.2903102, -48.8623476)),
+          position: fromPoint ),
     );
     markers.add(
       Marker(
           markerId: MarkerId("ToMarker"),
-          position: LatLng(-26.2903102, -48.8623476)),
+          position: toPoint),
     );
     return markers;
   }
