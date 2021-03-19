@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'DirectionsProvider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:location/location.dart' as loc;
 
 class MapPage extends StatefulWidget {
   @override
@@ -17,8 +18,10 @@ class _MapPageState extends State<MapPage> {
 
   final Geolocator _geolocator = Geolocator();
 
-  CameraPosition _initialLocation =
-      CameraPosition(target: LatLng(-26.2903102, -48.8623476), zoom: 13,);
+  CameraPosition _initialLocation = CameraPosition(
+    target: LatLng(-26.2903102, -48.8623476),
+    zoom: 13,
+  );
 
   final startAddressController = TextEditingController();
   final destinationAddressController = TextEditingController();
@@ -33,6 +36,7 @@ class _MapPageState extends State<MapPage> {
   PolylinePoints polylinePoints;
   Map<PolylineId, Polyline> polylines = {};
   List<LatLng> polylineCoordinates = [];
+  List userMoves = [];
 
   get locations => null;
 
@@ -107,6 +111,26 @@ class _MapPageState extends State<MapPage> {
     });
   }
 
+  void _listenToLocationChange() async {
+      try {
+    _geolocator.getPositionStream(LocationOptions(
+    accuracy: LocationAccuracy.best, distanceFilter: 2))
+        .listen((newPosition) {
+
+      var movementInfo = {
+        'timestamp': newPosition.timestamp,
+        'Speed': newPosition.speed,
+        'Position': newPosition,
+      };
+
+      userMoves.add(movementInfo);
+      print(userMoves.length);
+    });
+      } catch (e) {
+        print('Error: ${e.toString()}');
+      }
+  }
+
   _getCurrentAddress() async {
     try {
       List<Placemark> p = await _geolocator.placemarkFromCoordinates(
@@ -116,7 +140,8 @@ class _MapPageState extends State<MapPage> {
 
       setState(() {
         _currentAddress =
-        "${place.name}, ${place.locality}, ${place.postalCode}, ${place.country}";
+            "${place.name}, ${place.locality}, ${place.postalCode}, ${place.country}";
+        print('CURRENT ADDRESS: $_currentAddress');
         startAddressController.text = _currentAddress;
         _startAddress = _currentAddress;
       });
@@ -125,15 +150,6 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  Future<String> _getAddress(Position position) async {
-      List<Placemark> p = await _geolocator.placemarkFromCoordinates(
-          position.latitude, position.longitude);
-
-      Placemark place = p[0];
-      setState(() {
-        _currentAddress = "${place.name}, ${place.locality}, ${place.postalCode}, ${place.country}";
-      });
-  }
   // Future<bool> _calculateDistance() async {
   //   try {
   //     // Retrieving placemarks from addresses
@@ -194,15 +210,6 @@ class _MapPageState extends State<MapPage> {
   //   return false;
   // }
 
-  double _coordinateDistance(lat1, lon1, lat2, lon2) {
-    var p = 0.017453292519943295;
-    var c = cos;
-    var a = 0.5 -
-        c((lat2 - lat1) * p) / 2 +
-        c(lat1 * p) * c(lat2 * p) * (1 - c((lon2 - lon1) * p)) / 2;
-    return 12742 * asin(sqrt(a));
-  }
-
   _createPolylines(Position start, Position destination) async {
     polylinePoints = PolylinePoints();
     PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
@@ -232,6 +239,7 @@ class _MapPageState extends State<MapPage> {
   void initState() {
     super.initState();
     _getCurrentLocation();
+    _getCurrentAddress();
     //_polylines = keyByPolylineId(widget.polylines);  botar as polylines da estrutur que pode começar aqui
   }
 
@@ -259,7 +267,8 @@ class _MapPageState extends State<MapPage> {
                   zoomGesturesEnabled: true,
                   zoomControlsEnabled: false,
                   markers: markers != null ? Set<Marker>.from(markers) : null,
-                  polylines: api.currentRoute, //posso add as polylines marcando ruas com infraestrutura cicloviaria bem clarinho
+                  polylines: api.currentRoute,
+                  //posso add as polylines marcando ruas com infraestrutura cicloviaria bem clarinho
                   onMapCreated: (GoogleMapController controller) {
                     mapController = controller;
                   },
@@ -323,30 +332,42 @@ class _MapPageState extends State<MapPage> {
                           ),
                           SizedBox(height: 5),
                           RaisedButton(
-                            onPressed: (_startAddress != '' &&
-                                _destinationAddress != '')
+                            onPressed: (_destinationAddress != '')
                                 ? () async {
+                                    List<Placemark> startPlacemark =
+                                        await _geolocator.placemarkFromAddress(
+                                            _startAddress);
+                                    List<Placemark> destinationPlacemark =
+                                        await _geolocator.placemarkFromAddress(
+                                            _destinationAddress);
 
-                              List<Placemark> startPlacemark = await _geolocator.placemarkFromAddress(_startAddress);
-                              List<Placemark> destinationPlacemark = await _geolocator.placemarkFromAddress(_destinationAddress);
+                                    var api = Provider.of<DirectionProvider>(
+                                        context,
+                                        listen: false);
 
-                              var api = Provider.of<DirectionProvider>(context, listen: false);
+                                    LatLng fromPoint = LatLng(
+                                        startPlacemark[0].position.latitude,
+                                        startPlacemark[0].position.longitude);
+                                    LatLng toPoint = LatLng(
+                                        destinationPlacemark[0]
+                                            .position
+                                            .latitude,
+                                        destinationPlacemark[0]
+                                            .position
+                                            .longitude);
 
-                              LatLng fromPoint = LatLng(startPlacemark[0].position.latitude, startPlacemark[0].position.longitude);
-                              LatLng toPoint = LatLng(destinationPlacemark[0].position.latitude, destinationPlacemark[0].position.longitude);
-
-                              setState(() {
-                                api.findDirections(_startAddress, _destinationAddress);
-                                print("oiiiii");
-
-                                markers.add(Marker(
-                                    markerId: MarkerId('sourcePin'),
-                                    position: fromPoint),);
-
-                                var cameraUpdate = CameraUpdate.newLatLngBounds(_getScreenBounds(fromPoint, toPoint, api), 50);
-                                mapController.animateCamera(cameraUpdate);
-                              });
-                            }
+                                    setState(() {
+                                      _listenToLocationChange();
+                                      api.findDirections(
+                                          _startAddress, _destinationAddress);
+                                      var cameraUpdate =
+                                          CameraUpdate.newLatLngBounds(
+                                              _getScreenBounds(
+                                                  fromPoint, toPoint, api),
+                                              50);
+                                      mapController.animateCamera(cameraUpdate);
+                                    });
+                                  }
                                 : null,
                             color: Colors.red,
                             shape: RoundedRectangleBorder(
@@ -359,9 +380,9 @@ class _MapPageState extends State<MapPage> {
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 20.0,
-                                  ),
                                 ),
                               ),
+                            ),
                           ),
                         ],
                       ),
@@ -417,13 +438,42 @@ class _MapPageState extends State<MapPage> {
                 ),
               ),
             ),
+            SafeArea(
+              child: Align(
+                alignment: Alignment.bottomRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 20.0, bottom: 20.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: <Widget>[
+                      ClipOval(
+                        child: Material(
+                          color: Colors.red[300], // button color
+                          child: InkWell(
+                            splashColor: Colors.red, // inkwell color
+                            child: SizedBox(
+                              width: 50,
+                              height: 50,
+                              child: Text("Report Event"),
+                            ),
+                            onTap: () {
+
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  _getScreenBounds( LatLng fromPoint, LatLng toPoint, DirectionProvider api) {
+  _getScreenBounds(LatLng fromPoint, LatLng toPoint, DirectionProvider api) {
     var left = min(fromPoint.latitude, toPoint.latitude);
     var right = max(fromPoint.latitude, toPoint.latitude);
     var top = max(fromPoint.longitude, toPoint.longitude);
@@ -447,16 +497,11 @@ class _MapPageState extends State<MapPage> {
   Set<Marker> _createMarkers(LatLng fromPoint, LatLng toPoint) {
     var markers = Set<Marker>();
     markers.add(
-      Marker(
-          markerId: MarkerId("FromMarker"),
-          position: fromPoint ),
+      Marker(markerId: MarkerId("FromMarker"), position: fromPoint),
     );
     markers.add(
-      Marker(
-          markerId: MarkerId("ToMarker"),
-          position: toPoint),
+      Marker(markerId: MarkerId("ToMarker"), position: toPoint),
     );
     return markers;
   }
 }
-

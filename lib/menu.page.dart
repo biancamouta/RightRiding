@@ -36,13 +36,6 @@ class MainMenu extends StatelessWidget {
                 children: <Widget>[
                   SizedBox(height: 10),
                   RaisedButton(
-                    color: Colors.deepOrangeAccent,
-                    child: Text('Mapa de cicloviário de Joinville',
-                        textAlign: TextAlign.center),
-                    onPressed: () {},
-                  ),
-                  SizedBox(height: 10),
-                  RaisedButton(
                     color: Colors.amberAccent,
                     child: Text('Consultar Rota', textAlign: TextAlign.center),
                     onPressed: () {
