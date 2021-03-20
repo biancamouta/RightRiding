@@ -20,6 +20,7 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   GoogleMapController mapController;
   List<Marker> markers = [];
+  int _routeCode = 1;
 
   final Geolocator _geolocator = Geolocator();
 
@@ -125,16 +126,18 @@ class _MapPageState extends State<MapPage> {
     accuracy: LocationAccuracy.best, distanceFilter: 2))
         .listen((newPosition) {
 
-      _addGeoPoint(newPosition);
+      _addPointToDatabase(newPosition);
+
     });
       } catch (e) {
         print('Error: ${e.toString()}');
       }
   }
 
-  Future<DocumentReference> _addGeoPoint(Position position) async {
+  Future<DocumentReference> _addPointToDatabase(Position position) async {
     GeoFirePoint point = geo.point(latitude: position.latitude, longitude: position.longitude);
-    return firestore.collection('locations').add({
+    return firestore.collection('routes').add({
+      'name': _routeCode.toString(),
       'timestamp': position.timestamp,
       'position': point.data,
       'speed': position.speed
