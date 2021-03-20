@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "427208133769",
+    "project_id": "rightriding",
+    "storage_bucket": "rightriding.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:427208133769:android:6fed7f236fd04694b44a58",
+        "android_client_info": {
+          "package_name": "com.example.rightriding"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "427208133769-ork1dbtbf76gjpg1rogg7kb0kdvb8rgf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKqUfBeZbg0wczBzPIEsb_8gnFF_Dsfa4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "427208133769-ork1dbtbf76gjpg1rogg7kb0kdvb8rgf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

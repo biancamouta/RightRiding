@@ -7,6 +7,10 @@ import 'DirectionsProvider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:location/location.dart' as loc;
+import 'package:geoflutterfire/geoflutterfire.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:rxdart/rxdart.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 class MapPage extends StatefulWidget {
   @override
@@ -15,8 +19,12 @@ class MapPage extends StatefulWidget {
 
 class _MapPageState extends State<MapPage> {
   GoogleMapController mapController;
+  List<Marker> markers = [];
 
   final Geolocator _geolocator = Geolocator();
+
+  Firestore firestore = Firestore.instance;
+  Geoflutterfire geo = Geoflutterfire();
 
   CameraPosition _initialLocation = CameraPosition(
     target: LatLng(-26.2903102, -48.8623476),
@@ -117,19 +125,22 @@ class _MapPageState extends State<MapPage> {
     accuracy: LocationAccuracy.best, distanceFilter: 2))
         .listen((newPosition) {
 
-      var movementInfo = {
-        'timestamp': newPosition.timestamp,
-        'Speed': newPosition.speed,
-        'Position': newPosition,
-      };
-
-      userMoves.add(movementInfo);
-      print(userMoves.length);
+      _addGeoPoint(newPosition);
     });
       } catch (e) {
         print('Error: ${e.toString()}');
       }
   }
+
+  Future<DocumentReference> _addGeoPoint(Position position) async {
+    GeoFirePoint point = geo.point(latitude: position.latitude, longitude: position.longitude);
+    return firestore.collection('locations').add({
+      'timestamp': position.timestamp,
+      'position': point.data,
+      'speed': position.speed
+    });
+  }
+
 
   _getCurrentAddress() async {
     try {
@@ -266,11 +277,13 @@ class _MapPageState extends State<MapPage> {
                   mapType: MapType.normal,
                   zoomGesturesEnabled: true,
                   zoomControlsEnabled: false,
-                  markers: markers != null ? Set<Marker>.from(markers) : null,
+                  markers: Set<Marker>.of(markers),
                   polylines: api.currentRoute,
                   //posso add as polylines marcando ruas com infraestrutura cicloviaria bem clarinho
                   onMapCreated: (GoogleMapController controller) {
-                    mapController = controller;
+                    setState(() {
+                      mapController = controller;
+                    });
                   },
                 );
               },
@@ -357,6 +370,9 @@ class _MapPageState extends State<MapPage> {
                                             .longitude);
 
                                     setState(() {
+                                      // _addMarker(fromPoint, "From");
+                                      // _addMarker(toPoint, "To");
+
                                       _listenToLocationChange();
                                       api.findDirections(
                                           _startAddress, _destinationAddress);
@@ -494,14 +510,27 @@ class _MapPageState extends State<MapPage> {
     return bounds;
   }
 
-  Set<Marker> _createMarkers(LatLng fromPoint, LatLng toPoint) {
-    var markers = Set<Marker>();
-    markers.add(
-      Marker(markerId: MarkerId("FromMarker"), position: fromPoint),
+  void _addMarker(LatLng position, String label) {
+    final Marker marker = Marker(
+      position: position,
+      infoWindow: InfoWindow(title: label),
     );
-    markers.add(
-      Marker(markerId: MarkerId("ToMarker"), position: toPoint),
-    );
-    return markers;
+
+    setState(() {
+      markers.add(marker);
+    });
   }
+
+
+
+  // _animateToUser() async {
+  //   var pos = await location.getLocation();
+  //   mapController.animateCamera(CameraUpdate.newCameraPosition(
+  //       CameraPosition(
+  //         target: LatLng(pos['latitude'], pos['longitude']),
+  //         zoom: 17.0,
+  //       )
+  //   )
+  //   );
+  // }
 }
