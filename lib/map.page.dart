@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -18,8 +19,7 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPageState extends State<MapPage> {
-
-  late GoogleMapController mapController;
+  GoogleMapController mapController;
   CameraPosition _initialLocation = CameraPosition(
     target: LatLng(-26.2903102, -48.8623476),
     zoom: 13,
@@ -112,23 +112,66 @@ class _MapPageState extends State<MapPage> {
     });
   }
 
-  void _listenToLocationChange() async {
-      try {
-    _geolocator.getPositionStream(LocationOptions(
-    accuracy: LocationAccuracy.best, distanceFilter: 2))
-        .listen((newPosition) {
-          _addPointToDatabase(newPosition);
-    });
+  Future<StreamSubscription>_listenToLocationChange(LatLng toPoint) async {
+    var distanceUntilDestiny = 1000.0;
 
-      } catch (e) {
-        print('Error: ${e.toString()}');
+    StreamSubscription subscription = _geolocator
+        .getPositionStream(
+            LocationOptions(accuracy: LocationAccuracy.best, distanceFilter: 2))
+        .listen((newPosition) async {
+      _addPointToDatabase(newPosition);
+
+      var cameraUpdate = CameraUpdate.newCameraPosition(CameraPosition(
+        target: LatLng(newPosition.latitude, newPosition.longitude),
+        zoom: 15,
+      ));
+      mapController.animateCamera(cameraUpdate);
+
+      distanceUntilDestiny = await _geolocator.distanceBetween(
+          newPosition.latitude,
+          newPosition.longitude,
+          toPoint.latitude,
+          toPoint.longitude);
+      //tesntar retornar a distancia.
+      if (distanceUntilDestiny < 20) {
+        print("ARRIVED!!");
+        //PARAR DE MANDAR COISA P BANCO
       }
+    });
+    return subscription;
   }
 
+  // _listenToArrival(LatLng toPoint) async {
+  //   Position position;
+  //   var distanceUntilDestiny = 1000.0;
+  //
+  //   while (distanceUntilDestiny > 5) {
+  //     position = await _geolocator.getCurrentPosition(
+  //         desiredAccuracy: LocationAccuracy.best);
+  //     distanceUntilDestiny = await _geolocator.distanceBetween(
+  //         position.latitude,
+  //         position.longitude,
+  //         toPoint.latitude,
+  //         toPoint.longitude);
+  //   }
+  //   return true;
+  // }
+
+  // void _listenToLocationChange2(LatLng fromPoint, LatLng toPoint) async {
+  //   Future<Position> position;
+  //
+  //   Future<double> distanceUntilDestiny =  _geolocator.distanceBetween(fromPoint.latitude, toPoint.longitude, toPoint.latitude, toPoint.longitude);
+  //   while (distanceUntilDestiny > 5){
+  //     position = _geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best)
+  //     distanceUntilDestiny = _geolocator.distanceBetween(position.latitude, position.longitude, toPoint.latitude, toPoint.longitude);
+  //   }
+  // }
+
   Future<DocumentReference> _addPointToDatabase(Position position) async {
-    GeoFirePoint point = geo.point(latitude: position.latitude, longitude: position.longitude);
+    GeoFirePoint point =
+        geo.point(latitude: position.latitude, longitude: position.longitude);
     return firestore.collection('routes').add({
-      'name': _routeCode.toString(),
+      'name': '1',
       'timestamp': position.timestamp,
       'position': point.data,
       'speed': position.speed
@@ -280,16 +323,10 @@ class _MapPageState extends State<MapPage> {
                                     setState(() {
                                       // _addMarker(fromPoint, "From");
                                       // _addMarker(toPoint, "To");
-
-                                      _listenToLocationChange();
+                                      _listenToLocationChange(toPoint);
                                       api.findDirections(
                                           _startAddress, _destinationAddress);
-                                      var cameraUpdate =
-                                          CameraUpdate.newLatLngBounds(
-                                              _getScreenBounds(
-                                                  fromPoint, toPoint, api),
-                                              50);
-                                      mapController.animateCamera(cameraUpdate);
+
                                     });
                                   }
                                 : null,
@@ -380,9 +417,7 @@ class _MapPageState extends State<MapPage> {
                               height: 50,
                               child: Text("Report Event"),
                             ),
-                            onTap: () {
-
-                            },
+                            onTap: () {},
                           ),
                         ),
                       ),
@@ -397,47 +432,26 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
-  _getScreenBounds(LatLng fromPoint, LatLng toPoint, DirectionProvider api) {
-    var left = min(fromPoint.latitude, toPoint.latitude);
-    var right = max(fromPoint.latitude, toPoint.latitude);
-    var top = max(fromPoint.longitude, toPoint.longitude);
-    var bottom = min(fromPoint.longitude, toPoint.longitude);
+// void _addMarker(LatLng position, String label) {
+//   final Marker marker = Marker(
+//     markerId: markerId,
+//     position: position,
+//     infoWindow: InfoWindow(title: label),
+//   );
+//
+//   setState(() {
+//     markers.add(marker);
+//   });
+// }
 
-    api.currentRoute.first.points.forEach((point) {
-      left = min(left, point.latitude);
-      right = max(right, point.latitude);
-      top = max(top, point.longitude);
-      bottom = min(bottom, point.longitude);
-    });
-
-    var bounds = LatLngBounds(
-      southwest: LatLng(left, bottom),
-      northeast: LatLng(right, top),
-    );
-
-    return bounds;
-  }
-
-  // void _addMarker(LatLng position, String label) {
-  //   final Marker marker = Marker(
-  //     markerId: markerId,
-  //     position: position,
-  //     infoWindow: InfoWindow(title: label),
-  //   );
-  //
-  //   setState(() {
-  //     markers.add(marker);
-  //   });
-  // }
-
-  // _animateToUser() async {
-  //   var pos = await location.getLocation();
-  //   mapController.animateCamera(CameraUpdate.newCameraPosition(
-  //       CameraPosition(
-  //         target: LatLng(pos['latitude'], pos['longitude']),
-  //         zoom: 17.0,
-  //       )
-  //   )
-  //   );
-  // }
+// _animateToUser() async {
+//   var pos = await location.getLocation();
+//   mapController.animateCamera(CameraUpdate.newCameraPosition(
+//       CameraPosition(
+//         target: LatLng(pos['latitude'], pos['longitude']),
+//         zoom: 17.0,
+//       )
+//   )
+//   );
+// }
 }
