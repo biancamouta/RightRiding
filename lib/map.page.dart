@@ -18,36 +18,28 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPageState extends State<MapPage> {
-  GoogleMapController mapController;
-  List<Marker> markers = [];
-  int _routeCode = 1;
 
-  final Geolocator _geolocator = Geolocator();
-
-  Firestore firestore = Firestore.instance;
-  Geoflutterfire geo = Geoflutterfire();
-
+  late GoogleMapController mapController;
   CameraPosition _initialLocation = CameraPosition(
     target: LatLng(-26.2903102, -48.8623476),
     zoom: 13,
   );
 
+  final Geolocator _geolocator = Geolocator();
+  Firestore firestore = Firestore.instance;
+  Geoflutterfire geo = Geoflutterfire();
+
   final startAddressController = TextEditingController();
   final destinationAddressController = TextEditingController();
 
-  Position _currentPosition;
-
+  Position _currentPosition = Position();
+  String _placeDistance = '';
   String _startAddress = '';
   String _destinationAddress = '';
   String _currentAddress = '';
-  String _placeDistance;
-
-  PolylinePoints polylinePoints;
+  PolylinePoints polylinePoints = PolylinePoints();
   Map<PolylineId, Polyline> polylines = {};
-  List<LatLng> polylineCoordinates = [];
-  List userMoves = [];
-
-  get locations => null;
+  List<Marker> markers = [];
 
   Widget _textField({
     TextEditingController controller,
@@ -78,7 +70,7 @@ class _MapPageState extends State<MapPage> {
               Radius.circular(10.0),
             ),
             borderSide: BorderSide(
-              color: Colors.grey[400],
+              color: Colors.grey.shade400,
               width: 2,
             ),
           ),
@@ -87,7 +79,7 @@ class _MapPageState extends State<MapPage> {
               Radius.circular(10.0),
             ),
             borderSide: BorderSide(
-              color: Colors.blue[300],
+              color: Colors.blue.shade300,
               width: 2,
             ),
           ),
@@ -125,10 +117,9 @@ class _MapPageState extends State<MapPage> {
     _geolocator.getPositionStream(LocationOptions(
     accuracy: LocationAccuracy.best, distanceFilter: 2))
         .listen((newPosition) {
-
-      _addPointToDatabase(newPosition);
-
+          _addPointToDatabase(newPosition);
     });
+
       } catch (e) {
         print('Error: ${e.toString()}');
       }
@@ -143,7 +134,6 @@ class _MapPageState extends State<MapPage> {
       'speed': position.speed
     });
   }
-
 
   _getCurrentAddress() async {
     try {
@@ -162,91 +152,6 @@ class _MapPageState extends State<MapPage> {
     } catch (e) {
       print(e);
     }
-  }
-
-  // Future<bool> _calculateDistance() async {
-  //   try {
-  //     // Retrieving placemarks from addresses
-  //     List<Placemark> startPlacemark =
-  //     await _geolocator.placemarkFromAddress(_startAddress);
-  //     List<Placemark> destinationPlacemark =
-  //     await _geolocator.placemarkFromAddress(_destinationAddress);
-  //
-  //     if (startPlacemark != null && destinationPlacemark != null) {
-  //       Position startCoordinates = _startAddress == _currentAddress
-  //           ? Position(
-  //           latitude: _currentPosition.latitude,
-  //           longitude: _currentPosition.longitude)
-  //           : startPlacemark[0].position;
-  //       Position destinationCoordinates = destinationPlacemark[0].position;
-  //
-  //       // Start Location Marker
-  //       Marker startMarker = Marker(
-  //         markerId: MarkerId('$startCoordinates'),
-  //         position: LatLng(
-  //           startCoordinates.latitude,
-  //           startCoordinates.longitude,
-  //         ),
-  //         infoWindow: InfoWindow(
-  //           title: 'Start',
-  //           snippet: _startAddress,
-  //         ),
-  //         icon: BitmapDescriptor.defaultMarker,
-  //       );
-  //
-  //       // Destination Location Marker
-  //       Marker destinationMarker = Marker(
-  //         markerId: MarkerId('$destinationCoordinates'),
-  //         position: LatLng(
-  //           destinationCoordinates.latitude,
-  //           destinationCoordinates.longitude,
-  //         ),
-  //         infoWindow: InfoWindow(
-  //           title: 'Destination',
-  //           snippet: _destinationAddress,
-  //         ),
-  //         icon: BitmapDescriptor.defaultMarker,
-  //       );
-  //
-  //       markers.add(startMarker);
-  //       markers.add(destinationMarker);
-  //
-  //       setState(() {
-  //         _placeDistance = totalDistance.toStringAsFixed(2);
-  //         print('DISTANCE: $_placeDistance km');
-  //       });
-  //
-  //       return true;
-  //     }
-  //   } catch (e) {
-  //     print(e);
-  //   }
-  //   return false;
-  // }
-
-  _createPolylines(Position start, Position destination) async {
-    polylinePoints = PolylinePoints();
-    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-      "AIzaSyAqBtGRNSUpEZAnZxAUbr_lov0nEKmI6eY", // Google Maps API Key
-      PointLatLng(start.latitude, start.longitude),
-      PointLatLng(destination.latitude, destination.longitude),
-      travelMode: TravelMode.transit,
-    );
-
-    if (result.points.isNotEmpty) {
-      result.points.forEach((PointLatLng point) {
-        polylineCoordinates.add(LatLng(point.latitude, point.longitude));
-      });
-    }
-
-    PolylineId id = PolylineId('poly');
-    Polyline polyline = Polyline(
-      polylineId: id,
-      color: Colors.red,
-      points: polylineCoordinates,
-      width: 3,
-    );
-    polylines[id] = polyline;
   }
 
   @override
@@ -513,18 +418,17 @@ class _MapPageState extends State<MapPage> {
     return bounds;
   }
 
-  void _addMarker(LatLng position, String label) {
-    final Marker marker = Marker(
-      position: position,
-      infoWindow: InfoWindow(title: label),
-    );
-
-    setState(() {
-      markers.add(marker);
-    });
-  }
-
-
+  // void _addMarker(LatLng position, String label) {
+  //   final Marker marker = Marker(
+  //     markerId: markerId,
+  //     position: position,
+  //     infoWindow: InfoWindow(title: label),
+  //   );
+  //
+  //   setState(() {
+  //     markers.add(marker);
+  //   });
+  // }
 
   // _animateToUser() async {
   //   var pos = await location.getLocation();

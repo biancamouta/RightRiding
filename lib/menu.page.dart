@@ -39,7 +39,7 @@ class MainMenu extends StatelessWidget {
                     color: Colors.amberAccent,
                     child: Text('Consultar Rota', textAlign: TextAlign.center),
                     onPressed: () {
-                      final Future<Route> future = Navigator.push(
+                      final Future future = Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) {
