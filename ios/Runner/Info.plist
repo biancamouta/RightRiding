@@ -55,5 +55,9 @@
 
     	<key>NSLocationAlwaysUsageDescription</key>
     	<value>So I can track you at all times</value>
+    	<key>LSApplicationQueriesSchemes<\key>
+    	<array>
+    	    <string>items<\string>
+    	 <\array>
 </dict>
 </plist>
