@@ -9,6 +9,7 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geoflutterfire/geoflutterfire.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:rate_my_app/rate_my_app.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 
 class MapPage extends StatefulWidget {
   @override
@@ -38,7 +39,9 @@ class _MapPageState extends State<MapPage> {
   DateTime lastRateTime = DateTime.now();
 
   PolylinePoints polylinePoints = PolylinePoints();
+  Set<Polyline> allPolylines = {};
   Map<PolylineId, Polyline> polylines = {};
+
   List<Marker> markers = [];
   DateTime startTime;
   int route = 1;
@@ -123,7 +126,10 @@ class _MapPageState extends State<MapPage> {
       actionsBuilder: (context, stars) {
         return [
           FlatButton(
-            child: Text('OK'),
+            child: Text(
+              'OK',
+              style: GoogleFonts.montserrat(),
+            ),
             onPressed: () {
               _addRatingToDatabase(route, section, newPosition, stars);
               Navigator.pop(context);
@@ -132,10 +138,10 @@ class _MapPageState extends State<MapPage> {
         ];
       },
       dialogStyle: const DialogStyle(
-        // Custom dialog styles.
+        dialogShape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(2.0))),
         titleAlign: TextAlign.center,
         messageAlign: TextAlign.center,
-        messagePadding: EdgeInsets.only(bottom: 20),
+        messagePadding: EdgeInsets.only(bottom: 10),
       ),
       starRatingOptions: const StarRatingOptions(),
     );
@@ -165,6 +171,8 @@ class _MapPageState extends State<MapPage> {
       });
 
       if (distanceUntilDestiny < 20) {
+        _ratingDialog(route, section, newPosition);
+
         _locationChangeSubscription.cancel();
         _stopSubscription.cancel();
         print("ARRIVED!! Subscription Cancelled");
@@ -192,6 +200,7 @@ class _MapPageState extends State<MapPage> {
 
     LocationOptions locationOptions = LocationOptions(accuracy: LocationAccuracy.best, timeInterval: 2000);
     Stream<Position> positionStream = _geolocatorStop.getPositionStream(locationOptions);
+
     _stopSubscription = positionStream.listen(
       (Position newPosition) async {
         delta = await _geolocatorStop.distanceBetween(last.latitude, last.longitude, newPosition.latitude, newPosition.longitude);
@@ -199,12 +208,12 @@ class _MapPageState extends State<MapPage> {
         timeSinceDepart = DateTime.now().difference(startTime);
         timeSinceLastRating = DateTime.now().difference(lastRateTime);
 
-        print('delta');
-        print(delta);
-
-        if ((newPosition.speed < 1 || delta < 1) && timeSinceDepart > Duration(seconds: 10) && timeSinceLastRating > Duration(seconds: 20)) {
+        if ((newPosition.speed < 1 || delta < 1) && (timeSinceDepart > Duration(seconds: 10)) && (timeSinceLastRating > Duration(seconds: 20))) {
           print("STOPPED!!");
           _ratingDialog(route, section, newPosition);
+          setState(() {
+            lastRateTime = DateTime.now();
+          });
           section++;
         } else {
           last = newPosition;
@@ -252,12 +261,45 @@ class _MapPageState extends State<MapPage> {
     return routesRef.orderBy('name').limit(1).hashCode;
   }
 
+  Map bikeLanes = {
+    'polylineId': '',
+     'polylineCoordinates': '',
+  };
+
+  List<LatLng> polylineCoordinates = [
+    LatLng(-26.2170704,-48.8003377),
+    LatLng(-26.2172218,-48.8000079),
+    LatLng(-26.2172784,-48.7998866),
+    LatLng(-26.2173748,-48.7996866),
+    LatLng(-26.2174435,-48.7995542),
+    LatLng(-26.2175059,-48.7994453),
+    LatLng(-26.2175636,-48.7993522),
+    LatLng(-26.2176454,-48.7992418),
+  ];
+
+  _addPolyLine(List<LatLng> polylineCoordinates) {
+    print("added polyline");
+    PolylineId id = PolylineId("poly");
+    Polyline polyline = Polyline(
+      polylineId: id,
+      color: Colors.green,
+      points: polylineCoordinates,
+      width: 2,
+    );
+    polylines[id] = polyline;
+
+    setState(() {
+      allPolylines.add(polyline);
+    });
+  }
+
+
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
     _getCurrentAddress();
-    //_polylines = keyByPolylineId(widget.polylines);  botar as polylines da estrutura que pode começar aqui
+    _addPolyLine(polylineCoordinates);
   }
 
   @override
@@ -293,7 +335,7 @@ class _MapPageState extends State<MapPage> {
                   zoomGesturesEnabled: true,
                   zoomControlsEnabled: false,
                   markers: Set<Marker>.of(markers),
-                  polylines: api.currentRoute,
+                  polylines: allPolylines,
                   //posso add as polylines marcando ruas com infraestrutura cicloviaria bem clarinho
                   onMapCreated: (GoogleMapController controller) {
                     setState(() {
@@ -363,6 +405,7 @@ class _MapPageState extends State<MapPage> {
                           ),
                           RaisedButton(
                             onPressed: () async {
+
                               Geolocator _geolocator = Geolocator();
 
                               List<Placemark> destinationPlacemark = await _geolocator.placemarkFromAddress(_destinationAddress);
@@ -374,6 +417,8 @@ class _MapPageState extends State<MapPage> {
                               var api = Provider.of<DirectionProvider>(context, listen: false);
 
                               setState(() {
+                                allPolylines.addAll(api.currentRoute);
+
                                 startTime = DateTime.now();
                                 route = _getRouteName() + 1;
 

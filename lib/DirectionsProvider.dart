@@ -34,7 +34,7 @@ class DirectionProvider extends ChangeNotifier {
         points: points,
         polylineId: maps.PolylineId("best route"),
         color: Colors.red,
-        width: 4,
+        width: 3,
       );
       newRoute.add(line);
 
