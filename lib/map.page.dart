@@ -1,18 +1,13 @@
 import 'dart:async';
-import 'dart:math';
-
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
-import 'package:rightriding/rating.page.dart';
 import 'DirectionsProvider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
-import 'package:location/location.dart' as loc;
 import 'package:geoflutterfire/geoflutterfire.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:rxdart/rxdart.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:rate_my_app/rate_my_app.dart';
 
 class MapPage extends StatefulWidget {
@@ -24,27 +19,29 @@ class _MapPageState extends State<MapPage> {
   GoogleMapController mapController;
   CameraPosition _initialLocation = CameraPosition(
     target: LatLng(-26.2903102, -48.8623476),
-    zoom: 13,
+    zoom: 17,
   );
 
-  final Geolocator _geolocator = Geolocator();
   Firestore firestore = Firestore.instance;
   Geoflutterfire geo = Geoflutterfire();
-
   final startAddressController = TextEditingController();
   final destinationAddressController = TextEditingController();
-  RateMyApp _rateMyApp = RateMyApp(
-    preferencesPrefix: 'RateMyApp_',
-  );
+  RateMyApp _rateMyApp = RateMyApp(preferencesPrefix: 'RateMyApp_');
 
   Position _currentPosition = Position();
-  String _placeDistance = '';
+  Position _startPosition;
+  Position _destinationPosition;
   String _startAddress = '';
-  String _destinationAddress = '';
-  String _currentAddress = '';
+  String _destinationAddress = ' ';
+  String _currentAddress;
+  var _placeDistance;
+  DateTime lastRateTime = DateTime.now();
+
   PolylinePoints polylinePoints = PolylinePoints();
   Map<PolylineId, Polyline> polylines = {};
   List<Marker> markers = [];
+  DateTime startTime;
+  int route = 1;
 
   Widget _textField({
     TextEditingController controller,
@@ -75,7 +72,7 @@ class _MapPageState extends State<MapPage> {
               Radius.circular(10.0),
             ),
             borderSide: BorderSide(
-              color: Colors.grey.shade400,
+              color: Colors.purple[100],
               width: 2,
             ),
           ),
@@ -84,7 +81,7 @@ class _MapPageState extends State<MapPage> {
               Radius.circular(10.0),
             ),
             borderSide: BorderSide(
-              color: Colors.blue.shade300,
+              color: Colors.purple,
               width: 2,
             ),
           ),
@@ -96,20 +93,10 @@ class _MapPageState extends State<MapPage> {
   }
 
   _getCurrentLocation() async {
-    await _geolocator
-        .getCurrentPosition(desiredAccuracy: LocationAccuracy.high)
-        .then((Position position) async {
+    await Geolocator().getCurrentPosition(desiredAccuracy: LocationAccuracy.high).then((Position position) async {
       setState(() {
         _currentPosition = position;
-        print('CURRENT POS: $_currentPosition');
-        mapController.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: LatLng(position.latitude, position.longitude),
-              zoom: 18.0,
-            ),
-          ),
-        );
+        _animateCamera(_currentPosition);
       });
       await _getCurrentAddress();
     }).catchError((e) {
@@ -117,326 +104,375 @@ class _MapPageState extends State<MapPage> {
     });
   }
 
-  _listenToLocationChange(LatLng toPoint) async {
-    var distanceUntilDestiny = 1000.0;
+  _animateCamera(Position position) async {
+    mapController.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
+      target: LatLng(position.latitude, position.longitude),
+      zoom: 17.0,
+    )));
+  }
 
-    _geolocator
-        .getPositionStream(
-        LocationOptions(accuracy: LocationAccuracy.best, distanceFilter: 2))
-        .listen(
-            (newPosition) async {
-          _addPointToDatabase(newPosition);
+  _ratingDialog(int route, int section, Position newPosition) {
+    setState(() {
+      lastRateTime = DateTime.now();
+    });
 
-          var cameraUpdate = CameraUpdate.newCameraPosition(CameraPosition(
-            target: LatLng(newPosition.latitude, newPosition.longitude),
-            zoom: 15,
-          ));
-          mapController.animateCamera(cameraUpdate);
-
-          distanceUntilDestiny = await _geolocator.distanceBetween(
-              newPosition.latitude,
-              newPosition.longitude,
-              toPoint.latitude,
-              toPoint.longitude);
-          //tentar retornar a distancia.
-
-          if (distanceUntilDestiny < 20) {
-            print("ARRIVED!!");
-
-            _rateMyApp.showStarRateDialog(
-              context,
-              title: 'O que você achou do trecho que percorreu?',
-              // contentBuilder: (context, defaultContent) => content, // This one allows you to change the default dialog content.
-              actionsBuilder: (context, stars) {
-                // Triggered when the user updates the star rating.
-                return [
-                  FlatButton(
-                    child: Text('OK'),
-                    onPressed: () async {
-                      firestore.collection('rates').add({
-                        'route': '1',
-                        'stars': stars,
-                      });
-
-                      await _rateMyApp
-                          .callEvent(RateMyAppEventType.rateButtonPressed);
-                      Navigator.pop(context);
-                    },
-                  ),
-                ];
-              },
-              dialogStyle: const DialogStyle(
-                // Custom dialog styles.
-                titleAlign: TextAlign.center,
-                messageAlign: TextAlign.center,
-                messagePadding: EdgeInsets.only(bottom: 20),
-              ),
-              starRatingOptions: const StarRatingOptions(),
-            );
-          }
-        }
-
-        // _listenToArrival(LatLng toPoint) async {
-        //   Position position;
-        //   var distanceUntilDestiny = 1000.0;
-        //
-        //   while (distanceUntilDestiny > 5) {
-        //     position = await _geolocator.getCurrentPosition(
-        //         desiredAccuracy: LocationAccuracy.best);
-        //     distanceUntilDestiny = await _geolocator.distanceBetween(
-        //         position.latitude,
-        //         position.longitude,
-        //         toPoint.latitude,
-        //         toPoint.longitude);
-        //   }
-        //   return true;
-        // }
-
-        Future<DocumentReference> _addPointToDatabase(Position position)
-    async {
-      GeoFirePoint point =
-      geo.point(latitude: position.latitude, longitude: position.longitude);
-      return firestore.collection('routes').add({
-        'name': '1',
-        'timestamp': position.timestamp,
-        'position': point.data,
-        'speed': position.speed
-      });
-    }
-
-    _getCurrentAddress() async {
-      try {
-        List<Placemark> p = await _geolocator.placemarkFromCoordinates(
-            _currentPosition.latitude, _currentPosition.longitude);
-
-        Placemark place = p[0];
-
-        setState(() {
-          _currentAddress =
-          "${place.name}, ${place.locality}, ${place.postalCode}, ${place
-              .country}";
-          print('CURRENT ADDRESS: $_currentAddress');
-          startAddressController.text = _currentAddress;
-          _startAddress = _currentAddress;
-        });
-      } catch (e) {
-        print(e);
-      }
-    }
-
-    @override
-    void initState() {
-      super.initState();
-      _getCurrentLocation();
-      _getCurrentAddress();
-      //_polylines = keyByPolylineId(widget.polylines);  botar as polylines da estrutur que pode começar aqui
-    }
-
-    @override
-    Widget build(BuildContext context) {
-      var height = MediaQuery
-          .of(context)
-          .size
-          .height;
-      var width = MediaQuery
-          .of(context)
-          .size
-          .width;
-      Set<Marker> markers = Set<Marker>();
-
-      return Container(
-        child: Scaffold(
-          appBar: AppBar(
-            title: Text("RightRiding"),
+    _rateMyApp.showStarRateDialog(
+      context,
+      title: 'O que você achou do trecho que percorreu?',
+      message: 'Dê uma nota:',
+      actionsBuilder: (context, stars) {
+        return [
+          FlatButton(
+            child: Text('OK'),
+            onPressed: () {
+              _addRatingToDatabase(route, section, newPosition, stars);
+              Navigator.pop(context);
+            },
           ),
-          body: Stack(
-            children: <Widget>[
-              Consumer<DirectionProvider>(
-                builder:
-                    (BuildContext context, DirectionProvider api,
-                    Widget child) {
-                  return GoogleMap(
-                    initialCameraPosition: _initialLocation,
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: true,
-                    mapType: MapType.normal,
-                    zoomGesturesEnabled: true,
-                    zoomControlsEnabled: false,
-                    markers: Set<Marker>.of(markers),
-                    polylines: api.currentRoute,
-                    //posso add as polylines marcando ruas com infraestrutura cicloviaria bem clarinho
-                    onMapCreated: (GoogleMapController controller) {
-                      setState(() {
-                        mapController = controller;
-                      });
-                    },
-                  );
-                },
-              ),
-              SafeArea(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 10.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white70,
-                        borderRadius: BorderRadius.all(
-                          Radius.circular(20.0),
-                        ),
+        ];
+      },
+      dialogStyle: const DialogStyle(
+        // Custom dialog styles.
+        titleAlign: TextAlign.center,
+        messageAlign: TextAlign.center,
+        messagePadding: EdgeInsets.only(bottom: 20),
+      ),
+      starRatingOptions: const StarRatingOptions(),
+    );
+  }
+
+  StreamSubscription<Position> _locationChangeSubscription;
+  StreamSubscription<Position> _stopSubscription;
+
+  void _listenToLocationChange(int route, Position fromPosition, Position toPosition) {
+    Geolocator _geolocatorChange = Geolocator();
+    var distanceUntilDestiny = 1000.0;
+    int section = 1;
+    Position last = fromPosition;
+    var delta = 10.0;
+    Duration timeSinceDepart;
+
+    LocationOptions locationOptions = LocationOptions(accuracy: LocationAccuracy.best, timeInterval: 2000);
+    Stream<Position> positionStream = _geolocatorChange.getPositionStream(locationOptions);
+    _locationChangeSubscription = positionStream.listen((Position newPosition) async {
+      _addLocationToDatabase(newPosition);
+      _animateCamera(newPosition);
+
+      distanceUntilDestiny = await _geolocatorChange.distanceBetween(newPosition.latitude, newPosition.longitude, toPosition.latitude, toPosition.longitude);
+
+      setState(() {
+        _placeDistance = distanceUntilDestiny;
+      });
+
+      if (distanceUntilDestiny < 20) {
+        _locationChangeSubscription.cancel();
+        _stopSubscription.cancel();
+        print("ARRIVED!! Subscription Cancelled");
+        setState(() {
+          //volte pro estado inicial da pagina
+        });
+      }
+
+      delta = await _geolocatorChange.distanceBetween(last.latitude, last.longitude, newPosition.latitude, newPosition.longitude);
+    });
+  }
+
+  // distanceUntilDestiny(Position position1, Position position2, Geolocator _geolocation) async {
+  //   var distance = await _geolocation.distanceBetween(position1.latitude, position1.longitude, position1.latitude, position1.longitude);
+  //   return distance;
+  // }
+
+  void _listenToStop(int route, Position fromPosition, Position toPosition) {
+    int section = 1;
+    Position last = fromPosition;
+    var delta = 10.0;
+    Duration timeSinceDepart;
+    Duration timeSinceLastRating;
+    Geolocator _geolocatorStop = Geolocator();
+
+    LocationOptions locationOptions = LocationOptions(accuracy: LocationAccuracy.best, timeInterval: 2000);
+    Stream<Position> positionStream = _geolocatorStop.getPositionStream(locationOptions);
+    _stopSubscription = positionStream.listen(
+      (Position newPosition) async {
+        delta = await _geolocatorStop.distanceBetween(last.latitude, last.longitude, newPosition.latitude, newPosition.longitude);
+
+        timeSinceDepart = DateTime.now().difference(startTime);
+        timeSinceLastRating = DateTime.now().difference(lastRateTime);
+
+        print('delta');
+        print(delta);
+
+        if ((newPosition.speed < 1 || delta < 1) && timeSinceDepart > Duration(seconds: 10) && timeSinceLastRating > Duration(seconds: 20)) {
+          print("STOPPED!!");
+          _ratingDialog(route, section, newPosition);
+          section++;
+        } else {
+          last = newPosition;
+        }
+      },
+    );
+  }
+
+  Future<DocumentReference> _addRatingToDatabase(int route, int section, Position position, double stars) async {
+    print("Rate added");
+    GeoFirePoint endOfSection = geo.point(latitude: position.latitude, longitude: position.longitude);
+    return firestore.collection('sections').add({
+      'route': route,
+      'stars': stars,
+      'section': section,
+      'end_of_section': endOfSection.data,
+      'average speed': '',
+    });
+  }
+
+  Future<DocumentReference> _addLocationToDatabase(Position position) async {
+    print("Location added");
+    GeoFirePoint point = geo.point(latitude: position.latitude, longitude: position.longitude);
+    return firestore.collection('routes').add({'name': route, 'timestamp': position.timestamp, 'position': point.data, 'speed': position.speed});
+  }
+
+  _getCurrentAddress() async {
+    try {
+      List<Placemark> p = await Geolocator().placemarkFromCoordinates(_currentPosition.latitude, _currentPosition.longitude);
+      Placemark place = p[0];
+
+      setState(() {
+        _currentAddress = "${place.name}, ${place.locality}, ${place.postalCode}, ${place.country}";
+        startAddressController.text = _currentAddress;
+        _startAddress = _currentAddress;
+        print(_currentAddress);
+      });
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  int _getRouteName() {
+    var routesRef = firestore.collection('routes');
+    return routesRef.orderBy('name').limit(1).hashCode;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+    _getCurrentAddress();
+    //_polylines = keyByPolylineId(widget.polylines);  botar as polylines da estrutura que pode começar aqui
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var height = MediaQuery.of(context).size.height;
+    var width = MediaQuery.of(context).size.width;
+    Set<Marker> markers = Set<Marker>();
+
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            "RR",
+            textScaleFactor: 1.1,
+            style: GoogleFonts.charmonman(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: Colors.purple[800],
+          toolbarHeight: 40,
+          actions: <Widget>[
+            Icon(Icons.directions_bike, color: Colors.white),
+          ],
+        ),
+        body: Stack(
+          children: <Widget>[
+            Consumer<DirectionProvider>(
+              builder: (BuildContext context, DirectionProvider api, Widget child) {
+                return GoogleMap(
+                  initialCameraPosition: _initialLocation,
+                  myLocationEnabled: true,
+                  mapType: MapType.normal,
+                  zoomGesturesEnabled: true,
+                  zoomControlsEnabled: false,
+                  markers: Set<Marker>.of(markers),
+                  polylines: api.currentRoute,
+                  //posso add as polylines marcando ruas com infraestrutura cicloviaria bem clarinho
+                  onMapCreated: (GoogleMapController controller) {
+                    setState(() {
+                      mapController = controller;
+                    });
+                  },
+                );
+              },
+            ),
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 10.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white70,
+                      borderRadius: BorderRadius.all(
+                        Radius.circular(20.0),
                       ),
-                      width: width * 0.9,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 10.0, bottom: 10.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            Text(
-                              'Find Route',
-                              style: TextStyle(fontSize: 20.0),
+                    ),
+                    width: width * 0.9,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 10.0, bottom: 10.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(
+                            'Buscar Rota',
+                            textScaleFactor: 1.2,
+                            style: GoogleFonts.montserrat(
+                              fontWeight: FontWeight.bold,
                             ),
-                            SizedBox(height: 10),
-                            _textField(
-                                label: 'From',
-                                initialValue: _currentAddress,
-                                controller: startAddressController,
-                                width: width,
-                                locationCallback: (String value) {
-                                  setState(() {
-                                    _startAddress = value;
-                                  });
-                                }),
-                            SizedBox(height: 10),
-                            _textField(
-                                label: 'To',
-                                initialValue: '',
-                                controller: destinationAddressController,
-                                width: width,
-                                locationCallback: (String value) {
-                                  setState(() {
-                                    _destinationAddress = value;
-                                  });
-                                }),
-                            SizedBox(height: 10),
-                            Visibility(
-                              visible: _placeDistance == null ? false : true,
-                              child: Text(
-                                'DISTANCE: $_placeDistance km',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            SizedBox(height: 5),
-                            RaisedButton(
-                              onPressed: (_destinationAddress != '')
-                                  ? () async {
-                                List<Placemark> startPlacemark =
-                                await _geolocator.placemarkFromAddress(
-                                    _startAddress);
-                                List<Placemark> destinationPlacemark =
-                                await _geolocator.placemarkFromAddress(
-                                    _destinationAddress);
-
-                                var api = Provider.of<DirectionProvider>(
-                                    context,
-                                    listen: false);
-
-                                LatLng fromPoint = LatLng(
-                                    startPlacemark[0].position.latitude,
-                                    startPlacemark[0].position.longitude);
-                                LatLng toPoint = LatLng(
-                                    destinationPlacemark[0]
-                                        .position
-                                        .latitude,
-                                    destinationPlacemark[0]
-                                        .position
-                                        .longitude);
-
+                          ),
+                          SizedBox(height: 5),
+                          _textField(
+                              label: 'Origem',
+                              initialValue: _currentAddress,
+                              controller: startAddressController,
+                              width: width,
+                              locationCallback: (String value) {
                                 setState(() {
-                                  // _addMarker(fromPoint, "From");
-                                  // _addMarker(toPoint, "To");
-                                  _listenToLocationChange(toPoint);
-                                  api.findDirections(
-                                      _startAddress, _destinationAddress);
+                                  _startAddress = value;
                                 });
-                              }
-                                  : null,
-                              color: Colors.red,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20.0),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Text(
-                                  'Show Route'.toUpperCase(),
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20.0,
-                                  ),
-                                ),
+                              }),
+                          SizedBox(height: 5),
+                          _textField(
+                              label: 'Destino',
+                              initialValue: 'rua max colin 585',
+                              controller: destinationAddressController,
+                              width: width,
+                              locationCallback: (String value) {
+                                setState(() {
+                                  _destinationAddress = value;
+                                });
+                              }),
+                          SizedBox(height: 5),
+                          Visibility(
+                            visible: _placeDistance == null ? false : true,
+                            child: Text(
+                              'Distancia: $_placeDistance m',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                          RaisedButton(
+                            onPressed: () async {
+                              Geolocator _geolocator = Geolocator();
+
+                              List<Placemark> destinationPlacemark = await _geolocator.placemarkFromAddress(_destinationAddress);
+                              List<Placemark> startPlacemark = await _geolocator.placemarkFromAddress(_startAddress);
+                              _destinationPosition = Position(longitude: destinationPlacemark[0].position.longitude, latitude: destinationPlacemark[0].position.latitude);
+                              _startPosition = Position(longitude: startPlacemark[0].position.longitude, latitude: startPlacemark[0].position.latitude);
+                              _placeDistance = await _geolocator.distanceBetween(_startPosition.latitude, _startPosition.longitude, _destinationPosition.latitude, _destinationPosition.longitude);
+
+                              var api = Provider.of<DirectionProvider>(context, listen: false);
+
+                              setState(() {
+                                startTime = DateTime.now();
+                                route = _getRouteName() + 1;
+
+                                // _addMarker(fromPoint, "From");
+                                // _addMarker(toPoint, "To");
+
+                                api.findDirections(_startAddress, _destinationAddress);
+                                _listenToLocationChange(route, _startPosition, _destinationPosition);
+
+                                _listenToStop(route, _startPosition, _destinationPosition);
+                              });
+                            },
+                            color: Colors.deepPurple[200],
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20.0),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(2.0),
+                              child: Text(
+                                'Mostrar Rota'.toUpperCase(),
+                                style: TextStyle(
+                                  color: Colors.deepPurple,
+                                ),
+                                textScaleFactor: 1,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
               ),
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 10.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: <Widget>[
-                      ClipOval(
-                        child: Material(
-                          color: Colors.blue[100], // button color
-                          child: InkWell(
-                            splashColor: Colors.blue, // inkwell color
-                            child: SizedBox(
-                              width: 50,
-                              height: 50,
-                              child: Icon(Icons.add),
-                            ),
-                            onTap: () {
-                              mapController.animateCamera(
-                                CameraUpdate.zoomIn(),
-                              );
-                            },
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 10.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    ClipOval(
+                      child: Material(
+                        color: Colors.pink[100], // button color
+                        child: InkWell(
+                          splashColor: Colors.pink, // inkwell color
+                          child: SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: Icon(Icons.add),
                           ),
+                          onTap: () {
+                            mapController.animateCamera(
+                              CameraUpdate.zoomIn(),
+                            );
+                          },
                         ),
                       ),
-                      SizedBox(height: 20),
-                      ClipOval(
-                        child: Material(
-                          color: Colors.blue[100], // button color
-                          child: InkWell(
-                            splashColor: Colors.blue, // inkwell color
-                            child: SizedBox(
-                              width: 50,
-                              height: 50,
-                              child: Icon(Icons.remove),
-                            ),
-                            onTap: () {
-                              mapController.animateCamera(
-                                CameraUpdate.zoomOut(),
-                              );
-                            },
+                    ),
+                    SizedBox(height: 15),
+                    ClipOval(
+                      child: Material(
+                        color: Colors.pink[100], // button color
+                        child: InkWell(
+                          splashColor: Colors.pink[400], // inkwell color
+                          child: SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: Icon(Icons.remove),
                           ),
+                          onTap: () {
+                            mapController.animateCamera(
+                              CameraUpdate.zoomOut(),
+                            );
+                          },
                         ),
-                      )
-                    ],
-                  ),
+                      ),
+                    )
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    if (_locationChangeSubscription != null) {
+      _locationChangeSubscription.cancel();
+      _locationChangeSubscription = null;
     }
+    if (_stopSubscription != null) {
+      _stopSubscription.cancel();
+      _stopSubscription = null;
+    }
+    super.dispose();
+  }
 
 // void _addMarker(LatLng position, String label) {
 //   final Marker marker = Marker(
@@ -450,14 +486,4 @@ class _MapPageState extends State<MapPage> {
 //   });
 // }
 
-// _animateToUser() async {
-//   var pos = await location.getLocation();
-//   mapController.animateCamera(CameraUpdate.newCameraPosition(
-//       CameraPosition(
-//         target: LatLng(pos['latitude'], pos['longitude']),
-//         zoom: 17.0,
-//       )
-//   )
-//   );
-// }
-  }
+}
