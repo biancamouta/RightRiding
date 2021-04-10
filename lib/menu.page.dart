@@ -21,8 +21,8 @@ class MainMenu extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.purple[700],
-              Colors.pink[300],
+              Colors.purple,
+              Colors.pink[200],
             ],
           ),
         ),
@@ -49,7 +49,7 @@ class MainMenu extends StatelessWidget {
               ),
               SizedBox(height: height * 0.08),
               RaisedButton(
-                color: Colors.green[200],
+                color: Colors.purple[700],
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)),
                 child:  Column(
                   children: [
