@@ -29,7 +29,8 @@ class _MapPageState extends State<MapPage> {
   final startAddressController = TextEditingController();
   final destinationAddressController = TextEditingController();
   RateMyApp _rateMyApp = RateMyApp(preferencesPrefix: 'RateMyApp_');
-
+  StreamSubscription<Position> _locationChangeSubscription;
+  StreamSubscription<Position> _stopSubscription;
   Position _currentPosition = Position();
   Position _startPosition;
   Position _destinationPosition;
@@ -148,9 +149,6 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
-  StreamSubscription<Position> _locationChangeSubscription;
-  StreamSubscription<Position> _stopSubscription;
-
   void _listenToLocationChange(int route, Position fromPosition, Position toPosition) {
     Geolocator _geolocatorChange = Geolocator();
     var distanceUntilDestiny = 1000.0;
@@ -185,11 +183,6 @@ class _MapPageState extends State<MapPage> {
       delta = await _geolocatorChange.distanceBetween(last.latitude, last.longitude, newPosition.latitude, newPosition.longitude);
     });
   }
-
-  // distanceUntilDestiny(Position position1, Position position2, Geolocator _geolocation) async {
-  //   var distance = await _geolocation.distanceBetween(position1.latitude, position1.longitude, position1.latitude, position1.longitude);
-  //   return distance;
-  // }
 
   void _listenToStop(int route, Position fromPosition, Position toPosition) {
     int section = 1;
@@ -299,6 +292,15 @@ class _MapPageState extends State<MapPage> {
     return polyline;
   }
 
+  dynamic _calculateDistance( dynamic _placeDistance) {
+    if (_placeDistance == null) {
+      return;
+    }
+    else {
+      return _placeDistance.toStringAsPrecision(4);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -403,8 +405,7 @@ class _MapPageState extends State<MapPage> {
                                   onPressed: () {
                                     setState(() {
                                       _getCurrentAddress();
-                                      Position position = _getCurrentLocation();
-                                      _animateCamera(position);
+                                      Future<Position> position = _getCurrentLocation();
                                     });
                                   },
                                   padding: EdgeInsets.all(2.0),
@@ -437,7 +438,7 @@ class _MapPageState extends State<MapPage> {
                           Visibility(
                             visible: _placeDistance == null ? false : true,
                             child: Text(
-                              'Distancia: ${_placeDistance.toStringAsPrecision(4)} m',
+                              'Distancia: ${_calculateDistance(_placeDistance)} m',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -451,9 +452,8 @@ class _MapPageState extends State<MapPage> {
                                 onPressed: () async {
                                   Geolocator _geolocator = Geolocator();
                                   List<Placemark> destinationPlacemark = await _geolocator.placemarkFromAddress(_destinationAddress);
-                                  List<Placemark> startPlacemark = await _geolocator.placemarkFromAddress(_startAddress);
                                   _destinationPosition = Position(longitude: destinationPlacemark[0].position.longitude, latitude: destinationPlacemark[0].position.latitude);
-                                  _startPosition = Position(longitude: startPlacemark[0].position.longitude, latitude: startPlacemark[0].position.latitude);
+                                  _startPosition = _currentPosition;
                                   _placeDistance = await _geolocator.distanceBetween(_startPosition.latitude, _startPosition.longitude, _destinationPosition.latitude, _destinationPosition.longitude);
                                   var api = Provider.of<DirectionProvider>(context, listen: false);
 
@@ -462,8 +462,8 @@ class _MapPageState extends State<MapPage> {
                                     route = _getRouteName() + 1;
                                     // _addMarker(fromPoint, "From");
                                     // _addMarker(toPoint, "To");
-                                    api.findDirections(_startAddress, _destinationAddress);
                                     allPolylines.addAll(api.currentRoute);
+                                    api.findDirections(_startPosition, _destinationPosition);
                                   });
                                 },
                                 color: Colors.deepPurple[200],
@@ -486,9 +486,8 @@ class _MapPageState extends State<MapPage> {
                                 onPressed: () async {
                                   Geolocator _geolocator = Geolocator();
                                   List<Placemark> destinationPlacemark = await _geolocator.placemarkFromAddress(_destinationAddress);
-                                  List<Placemark> startPlacemark = await _geolocator.placemarkFromAddress(_startAddress);
                                   _destinationPosition = Position(longitude: destinationPlacemark[0].position.longitude, latitude: destinationPlacemark[0].position.latitude);
-                                  _startPosition = Position(longitude: startPlacemark[0].position.longitude, latitude: startPlacemark[0].position.latitude);
+                                  _startPosition = _currentPosition;
                                   _placeDistance = await _geolocator.distanceBetween(_startPosition.latitude, _startPosition.longitude, _destinationPosition.latitude, _destinationPosition.longitude);
 
                                   setState(() {
@@ -515,8 +514,14 @@ class _MapPageState extends State<MapPage> {
                               RaisedButton(
                                 onPressed: () {
                                   setState(() {
-                                    _locationChangeSubscription.cancel();
-                                    _stopSubscription.cancel();
+                                    if (_locationChangeSubscription != null) {
+                                      _locationChangeSubscription.cancel();
+                                      _locationChangeSubscription = null;
+                                    }
+                                    if (_stopSubscription != null) {
+                                      _stopSubscription.cancel();
+                                      _stopSubscription = null;
+                                    }
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(

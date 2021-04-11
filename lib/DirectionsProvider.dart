@@ -10,10 +10,13 @@ class DirectionProvider extends ChangeNotifier {
 
   Set<maps.Polyline> get currentRoute => _route;
 
-  findDirections(String from, String to) async {
-    var result = await directionsApi.directionsWithAddress(
-      from,
-      to,
+  findDirections(dynamic from, dynamic to) async {
+    var origin = Location(from.latitude, from.longitude);
+    var destination = Location(to.latitude, to.longitude);
+
+    var result = await directionsApi.directions(
+      origin,
+      destination,
       travelMode: TravelMode.bicycling,
     );
 
