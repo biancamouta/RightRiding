@@ -85,6 +85,6 @@ class MainMenu extends StatelessWidget {
           ),
         ),
       ),
-    ));
+    ),);
   }
 }

@@ -25,7 +25,10 @@ class RightRidingApp extends StatelessWidget {
           backgroundColor: Colors.purple[800],
           toolbarHeight: 40,
           actions: <Widget>[
-            Icon(Icons.directions_bike,color: Colors.white,)
+            Padding(
+              padding: EdgeInsets.all(10.0),
+              child: Icon(Icons.directions_bike,color: Colors.white,),
+            ),
           ],
         ),
       ),
