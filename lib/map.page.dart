@@ -137,6 +137,7 @@ class _MapPageState extends State<MapPage> {
   }
 
   _ratingDialog(int section, Position newPosition) {
+    int stopReason = 0;
     setState(() {
       lastRateTime = DateTime.now();
     });
@@ -147,6 +148,47 @@ class _MapPageState extends State<MapPage> {
       message: 'Dê uma nota:',
       actionsBuilder: (context, stars) {
         return [
+          Container(
+            alignment: Alignment.center,
+            child: Text(
+              'Qual foi o motivo de paradạ?',
+              textScaleFactor: 1.2,
+              style: GoogleFonts.montserrat(
+                  fontWeight: FontWeight.bold),
+              )
+            ),
+          SizedBox(
+            height: 30,
+            child: ListTile(
+              title: const Text('Semáforo'),
+              leading: Radio(
+                value: 0,
+                groupValue: stopReason,
+                onChanged: (int value) {
+                  stopReason = value;
+                  setState(() {
+                    switch (value){}
+                  });
+                },
+              ),
+            ),
+          ),
+          SizedBox(
+            height: 30,
+            child: ListTile(
+              title: const Text('Outro'),
+              leading: Radio(
+                value: 1,
+                groupValue: stopReason,
+                onChanged: (int value) {
+                  stopReason = value;
+                  setState(() {
+                    switch (value){}
+                  });
+                },
+              ),
+            ),
+          ),
           FlatButton(
             child: Text(
               'OK',
@@ -160,10 +202,10 @@ class _MapPageState extends State<MapPage> {
         ];
       },
       dialogStyle: const DialogStyle(
-        dialogShape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(2.0))),
+        dialogShape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10.0))),
         titleAlign: TextAlign.center,
         messageAlign: TextAlign.center,
-        messagePadding: EdgeInsets.only(bottom: 10),
+        messagePadding: EdgeInsets.only(bottom: 7),
       ),
       starRatingOptions: const StarRatingOptions(),
     );
@@ -177,7 +219,6 @@ class _MapPageState extends State<MapPage> {
     LocationOptions locationOptions = LocationOptions(accuracy: LocationAccuracy.best, timeInterval: 2000);
     Stream<Position> positionStream = _geolocatorChange.getPositionStream(locationOptions);
     _locationChangeSubscription = positionStream.listen((Position newPosition) async {
-
       LocationOnMap newLocation = LocationOnMap(position: newPosition, speed: newPosition.speed);
       newLocation.addToDatabase();
 
@@ -193,8 +234,6 @@ class _MapPageState extends State<MapPage> {
         _currentRoute.to = newPosition;
         _locationChangeSubscription.cancel();
         _stopSubscription.cancel();
-
-        print("ARRIVED!! Subscription Cancelled");
         setState(() {
           //volte pro estado inicial da pagina
         });
@@ -221,11 +260,7 @@ class _MapPageState extends State<MapPage> {
         timeSinceLastRating = DateTime.now().difference(lastRateTime);
 
         if ((newPosition.speed < 1 || delta < 1) && (timeSinceDepart > Duration(seconds: 10)) && (timeSinceLastRating > Duration(seconds: 20))) {
-          print("STOPPED!!");
           _ratingDialog(section, newPosition);
-          setState(() {
-            lastRateTime = DateTime.now();
-          });
           section++;
         } else {
           last = newPosition;
@@ -243,6 +278,7 @@ class _MapPageState extends State<MapPage> {
       'section': section,
       'end_of_section': endOfSection.data,
       'average speed': '',
+      'motive': '',
     });
   }
 
@@ -251,11 +287,10 @@ class _MapPageState extends State<MapPage> {
     return routesRef.orderBy('name').limit(1).hashCode;
   }
 
-  dynamic _calculateDistance( dynamic _placeDistance) {
+  dynamic _calculateDistance(dynamic _placeDistance) {
     if (_placeDistance == null) {
       return;
-    }
-    else {
+    } else {
       return _placeDistance.toStringAsPrecision(4);
     }
   }
@@ -351,32 +386,30 @@ class _MapPageState extends State<MapPage> {
                                   controller: startAddressController,
                                   width: width * 0.832,
                                   locationCallback: (String value) {
-                                    setState(() {
-
-                                    });
+                                    setState(() {});
                                   }),
                               SizedBox(width: 5),
                               SizedBox(
                                 width: width * 0.132,
                                 height: width * 0.132,
                                 child: RaisedButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _getCurrentLocation();
-                                    });
-                                  },
-                                  padding: EdgeInsets.all(2.0),
-                                  color: Colors.white,
-                                  child: Icon(
-                                    Icons.location_searching,
-                                    size: 23,
-                                    color: Colors.deepPurple,
-                                  ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _getCurrentLocation();
+                                        _ratingDialog(1, null);
+                                      });
+                                    },
+                                    padding: EdgeInsets.all(2.0),
+                                    color: Colors.white,
+                                    child: Icon(
+                                      Icons.location_searching,
+                                      size: 23,
+                                      color: Colors.deepPurple,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: new BorderRadius.circular(10.0),
                                       side: BorderSide(color: Colors.purple[100], width: 2.0),
-                                    )
-                                ),
+                                    )),
                               ),
                             ],
                           ),
@@ -410,7 +443,8 @@ class _MapPageState extends State<MapPage> {
                                   Geolocator _geolocator = Geolocator();
                                   List<Placemark> destinationPlacemark = await _geolocator.placemarkFromAddress(_destinationAddress);
                                   _destinationPosition = Position(longitude: destinationPlacemark[0].position.longitude, latitude: destinationPlacemark[0].position.latitude);
-                                  _placeDistance = await _geolocator.distanceBetween(_currentPosition.latitude, _currentPosition.longitude, _destinationPosition.latitude, _destinationPosition.longitude);
+                                  _placeDistance =
+                                      await _geolocator.distanceBetween(_currentPosition.latitude, _currentPosition.longitude, _destinationPosition.latitude, _destinationPosition.longitude);
                                   var api = Provider.of<DirectionProvider>(context, listen: false);
 
                                   setState(() {
@@ -482,20 +516,21 @@ class _MapPageState extends State<MapPage> {
                                       _stopSubscription.cancel();
                                       _stopSubscription = null;
                                     }
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) {
-                                        return ChangeNotifierProvider(
-                                          create: (_) => DirectionProvider(),
-                                          child: MaterialApp(
-                                            home: MainMenu(),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  );
-                                  });},
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) {
+                                          return ChangeNotifierProvider(
+                                            create: (_) => DirectionProvider(),
+                                            child: MaterialApp(
+                                              home: MainMenu(),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    );
+                                  });
+                                },
                                 color: Colors.red[200],
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(20.0),
