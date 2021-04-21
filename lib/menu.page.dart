@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'DirectionsProvider.dart';
@@ -79,6 +80,27 @@ class MainMenu extends StatelessWidget {
                       },
                     ),
                   );
+                },
+              ),
+              SizedBox(height: 15),
+              RaisedButton(
+                color: Colors.pink[700],
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)),
+                child:  Column(
+                  children: [
+                    SizedBox(height: 15),
+                    Text(
+                      'Visualizar Última Rota',
+                      textAlign: TextAlign.center,
+                      textScaleFactor: 1.3,
+                      style: GoogleFonts.montserrat(
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 15)
+                  ],
+                ),
+                onPressed: () {
                 },
               ),
             ],
