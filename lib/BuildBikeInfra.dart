@@ -35,7 +35,7 @@ class BuildBikeInfra {
       polylineId: id,
       color: Colors.green,
       points: polylineCoordinates,
-      width: 3,
+      width: 1,
     );
     return polyline;
   }

@@ -13,6 +13,7 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geoflutterfire/geoflutterfire.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:rate_my_app/rate_my_app.dart';
+import 'package:search_cep/search_cep.dart';
 
 class MapPage extends StatefulWidget {
   @override
@@ -37,8 +38,8 @@ class _MapPageState extends State<MapPage> {
 
   Position _startPosition;
   Position _destinationPosition;
-  String _startAddress = '';
-  String _destinationAddress = ' ';
+  String _startAddress;
+  String _destinationAddress;
   String _currentAddress;
   var _placeDistance;
   DateTime lastRateTime = DateTime.now();
@@ -113,11 +114,14 @@ class _MapPageState extends State<MapPage> {
 
   _getCurrentAddress() async {
     try {
-      List<Placemark> p = await Geolocator().placemarkFromCoordinates(_currentPosition.latitude, _currentPosition.longitude);
+      List<Placemark> p = await Geolocator().placemarkFromPosition(_currentPosition);
       Placemark place = p[0];
+      ViaCepSearchCep cep = ViaCepSearchCep();
+      final info = await cep.searchInfoByCep(cep: place.postalCode.replaceAll("-", ""), returnType: SearchInfoType.json);
+      String streetName = info.fold((_) => null, (data) => data).logradouro;
 
       setState(() {
-        _currentAddress = "${place.name}, ${place.locality}, ${place.postalCode}, ${place.country}";
+        _currentAddress = "$streetName, ${place.name}, ${place.postalCode}, ${place.country}";
         startAddressController.text = _currentAddress;
       });
     } catch (e) {
@@ -260,7 +264,6 @@ class _MapPageState extends State<MapPage> {
   void initState() {
     super.initState();
     _getCurrentLocation();
-    _getCurrentAddress();
     allPolylines = BuildBikeInfra().build();
   }
 
@@ -344,12 +347,12 @@ class _MapPageState extends State<MapPage> {
                             children: [
                               _textField(
                                   label: 'Origem',
-                                  initialValue: _currentAddress,
+                                  initialValue: '',
                                   controller: startAddressController,
                                   width: width * 0.832,
                                   locationCallback: (String value) {
                                     setState(() {
-                                      _startAddress = value;
+
                                     });
                                   }),
                               SizedBox(width: 5),

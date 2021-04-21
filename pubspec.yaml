@@ -35,6 +35,7 @@ dependencies:
   rxdart: ^0.20.0
   geoflutterfire: ^2.0.2
   google_fonts: ^1.1.2
+  search_cep: ^3.0.0+2
 
   intl: 0.15.7
 
