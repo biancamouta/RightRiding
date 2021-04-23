@@ -20,6 +20,51 @@ class MapPage extends StatefulWidget {
   _MapPageState createState() => _MapPageState();
 }
 
+class Radiobutton extends StatefulWidget {
+  @override
+  RadioButtonWidget createState() => RadioButtonWidget();
+}
+
+class RadioButtonWidget extends State {
+  String radioItem = '';
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        RadioListTile(
+          groupValue: radioItem,
+          title: Text('Semáforo'),
+          value: 'Item 1',
+          onChanged: (val) {
+            setState(() {
+              radioItem = val;
+            });
+          },
+        ),
+        RadioListTile(
+          groupValue: radioItem,
+          title: Text(''),
+          value: 'Item 2',
+          onChanged: (val) {
+            setState(() {
+              radioItem = val;
+            });
+          },
+        ),
+        RadioListTile(
+          groupValue: radioItem,
+          title: Text('Outro'),
+          value: 'Item 3',
+          onChanged: (val) {
+            setState(() {
+              radioItem = val;
+            });
+          },
+        ),
+      ],
+    );
+  }
+}
+
 class _MapPageState extends State<MapPage> {
   GoogleMapController mapController;
   CameraPosition _initialCameraPosition = CameraPosition(
@@ -157,38 +202,7 @@ class _MapPageState extends State<MapPage> {
                   fontWeight: FontWeight.bold),
               )
             ),
-          SizedBox(
-            height: 30,
-            child: ListTile(
-              title: const Text('Semáforo'),
-              leading: Radio(
-                value: 0,
-                groupValue: stopReason,
-                onChanged: (int value) {
-                  stopReason = value;
-                  setState(() {
-                    switch (value){}
-                  });
-                },
-              ),
-            ),
-          ),
-          SizedBox(
-            height: 30,
-            child: ListTile(
-              title: const Text('Outro'),
-              leading: Radio(
-                value: 1,
-                groupValue: stopReason,
-                onChanged: (int value) {
-                  stopReason = value;
-                  setState(() {
-                    switch (value){}
-                  });
-                },
-              ),
-            ),
-          ),
+          Radiobutton(),
           FlatButton(
             child: Text(
               'OK',
